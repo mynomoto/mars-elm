@@ -5,6 +5,8 @@ import Html.CssHelpers exposing (withNamespace)
 import Html.Attributes exposing (id, src)
 import MainCss
 import Assets exposing (url, hero)
+import Arithmetic
+import List.Extra
 
 type Command = TurnRight | TurnLeft | Move
 type Direction = North | East | South | West
@@ -16,6 +18,7 @@ type alias Dimension = { x: Int, y: Int }
 type alias Rover = { position: Position
                    , direction: Direction
                    , status: Status
+                   , commands: List Command
                    }
 
 type alias Mars = { rovers: List Rover
@@ -84,9 +87,6 @@ parseCharCommands input = case input of
   'L' :: rest -> TurnLeft :: parseCharCommands rest
   _ :: rest -> parseCharCommands rest
 
-parseCommand : String -> List Command
-parseCommand input = input |> String.trim |> String.toUpper |> String.toList |> parseCharCommands
-
 parseDimensionInput : List String -> Maybe Dimension
 parseDimensionInput input = case input of
    x :: y :: [] -> case String.toInt x of
@@ -101,43 +101,74 @@ parseDimensionInput input = case input of
 parseDimension : String -> Maybe Dimension
 parseDimension input = input |> String.trim |> String.words |> parseDimensionInput
 
-parseProbeInput : List String -> Maybe Rover
-parseProbeInput input = case input of
+parseProbeInput : List String -> List Command -> Maybe Rover
+parseProbeInput input commands = case input of
    x :: y :: d :: [] -> case parseDimensionInput [x, y] of
       Nothing -> Nothing
       Just position -> case String.toUpper d of
          "N" -> Just { position = position
                      , direction = North
                      , status = Working
+                     , commands = commands
                      }
          "E" -> Just { position = position
                      , direction = East
                      , status = Working
+                     , commands = commands
                      }
          "S" -> Just { position = position
                      , direction = South
                      , status = Working
+                     , commands = commands
                      }
          "W" -> Just { position = position
                      , direction = West
                      , status = Working
+                     , commands = commands
                      }
          _ -> Nothing
 
    _ -> Nothing
 
-parseProbe : String -> Maybe Rover
-parseProbe input = input |> String.trim |> String.words |> parseProbeInput
+parseProbe : List String -> Maybe Rover
+parseProbe input =
+  case input of
+    rover :: commandString :: [] -> let
+        roverInput = rover |> String.trim |> String.words
+        commands = commandString |> String.trim |> String.toUpper |> String.toList |> parseCharCommands
+          in
+        parseProbeInput roverInput commands
+    _ -> Nothing
 
 { id, class, classList } =
     withNamespace "main"
 
--- Continue from here
 parseMars : List String -> Maybe Mars
-parseMars input = Nothing
+parseMars input = case input of
+  dimension :: rest -> if Arithmetic.isEven(List.length(rest)) then
+      let
+          roversInput = List.Extra.groupsOf 2 rest
+          mrovers = List.map parseProbe roversInput
+          mdimensions = parseDimension dimension
+      in
+          case mdimensions of
+            Nothing -> Nothing
+            Just dimensions -> if List.member Nothing mrovers then
+              Nothing
+            else
+              Just { rovers = List.map (Maybe.withDefault { position = { x = 0, y = 0}
+                     , direction = East
+                     , status = Kabum
+                     , commands = []
+                     }) mrovers
+                   , dimension = dimensions
+                   }
+    else
+      Nothing
+  _ -> Nothing
 
 parseTextArea : String -> Maybe Mars
-parseTextArea input = input |> String.lines |> List.map String.trim |> List.filter String.isEmpty |> parseMars
+parseTextArea input = input |> String.lines |> List.map String.trim |> List.filter (not << String.isEmpty) |> parseMars
 
 main : Html a
 main =
