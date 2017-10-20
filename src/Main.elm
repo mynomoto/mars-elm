@@ -3,6 +3,8 @@ module Main exposing (..)
 import Html exposing (Html, div, p)
 import Html.CssHelpers exposing (withNamespace)
 import Html.Attributes exposing (id, src)
+import Svg exposing (..)
+import Svg.Attributes exposing (..)
 import MainCss
 import Assets exposing (url, hero)
 import Arithmetic
@@ -170,12 +172,58 @@ parseMars input = case input of
 parseTextArea : String -> Maybe Mars
 parseTextArea input = input |> String.lines |> List.map String.trim |> List.filter (not << String.isEmpty) |> parseMars
 
+roundRect : Html msg
+roundRect =
+    svg
+      [ width "120", height "120", viewBox "0 0 120 120" ]
+      [ rect [ x "10", y "10", width "100", height "100", rx "15", ry "15" ] [] ]
+
+
+trianglePoints : String
+trianglePoints = "24,12.5 1,5 1,20"
+
+hexagonPoints : String
+hexagonPoints = "0,18 0,7 7,0 18,0 25,7 25,18 18,25 7,25"
+
+directionToAngle : Direction -> String
+directionToAngle direction = case direction of
+  East -> "0"
+  South -> "90"
+  West -> "180"
+  North -> "270"
+
+showRover : Rover -> Svg msg
+showRover rover = let
+    points_ = case rover.status of
+            Kabum -> hexagonPoints
+            Working -> trianglePoints
+      in
+          polygon [ points points_, transform ("translate(" ++ (toString rover.position.x) ++ " " ++ (toString rover.position.y) ++ ") rotate(" ++ (directionToAngle rover.direction) ++ " 12.5 12.5)") ] []
+
+cellSize : Int
+cellSize = 25
+
+showMars : Mars -> Svg msg
+showMars mars =
+  let
+      xcells =  (Basics.max mars.dimension.x 0) + 1
+      ycells =  (Basics.max mars.dimension.y 0) + 1
+  in
+  svg
+      [ width "120", height "120", Svg.Attributes.style "border: 1px solid red" ]
+      []
+
+marsm : Maybe Mars
+marsm = Just { rovers = []
+            , dimension  = { x = 3
+                           , y = 5 }}
+
 main : Html a
 main =
     div []
         [ div [ id MainCss.Page ] [ Html.text "Mars explorer" ]
         , div []
-            [ p [] [ Html.text "is a paragraph" ]
-            , p [] [ Html.text (toString West)]
+            [ case marsm of
+              Nothing -> Html.text "No planet to render"
+              Just mars -> showMars mars]
             ]
-        ]
