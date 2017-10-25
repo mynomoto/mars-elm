@@ -1,14 +1,21 @@
 module Main exposing (..)
 
-import Html exposing (Html, div, p)
+import Html exposing (Html, div, p, textarea)
 import Html.CssHelpers exposing (withNamespace)
-import Html.Attributes exposing (id, src)
+import Html.Attributes exposing (id, src, rows, cols, defaultValue)
+import Html.Events exposing (targetValue, on)
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
 import MainCss
 import Assets exposing (url, hero)
 import Arithmetic
 import List.Extra
+import Json.Decode as Json
+
+
+onKeyUp : (String -> msg) -> Attribute msg
+onKeyUp tagger =
+    on "keyup" (Json.map tagger targetValue)
 
 
 type Command
@@ -318,8 +325,8 @@ parseMars input =
             Nothing
 
 
-parseTextArea : String -> Maybe Mars
-parseTextArea input =
+parseTextInput : String -> Maybe Mars
+parseTextInput input =
     input |> String.lines |> List.map String.trim |> List.filter (not << String.isEmpty) |> parseMars
 
 
@@ -442,7 +449,7 @@ marsm =
                     , y = 0
                     }
               , direction = North
-              , status = Working
+              , status = Kabum
               , commands = []
               }
             , { position =
@@ -461,12 +468,73 @@ marsm =
         }
 
 
-main : Html a
+main : Program Never Model Msg
 main =
+    Html.beginnerProgram { model = model, view = view, update = update }
+
+
+model : Model
+model =
+    { mars = parseTextInput initialInput }
+
+
+initialInput : String
+initialInput =
+    """5 5
+1 2 N
+LMLMLMLMM
+3 3 E
+MMRMMRMRRM
+"""
+
+
+type alias Model =
+    { mars : Maybe Mars }
+
+
+type Msg
+    = UpdateMars String
+
+
+update : Msg -> Model -> Model
+update msg model =
+    case msg of
+        UpdateMars s ->
+            { model | mars = parseTextInput s }
+
+
+hasCommands : Rover -> Bool
+hasCommands rover =
+    List.isEmpty rover.commands |> not
+
+
+step : Mars -> Maybe Mars
+step mars =
+    if List.any hasCommands mars.rovers then
+        let
+            x =
+                2
+        in
+            Nothing
+    else
+        Nothing
+
+
+view : Model -> Html Msg
+view model =
     div []
-        [ div [ id MainCss.Page ] [ Html.text "Mars explorer" ]
+        [ Html.h1 [ id MainCss.Page ] [ Html.text "Mars explorer" ]
         , div []
-            [ case marsm of
+            [ textarea
+                [ rows 10
+                , cols 50
+                , onKeyUp (\string -> UpdateMars string)
+                , defaultValue initialInput
+                ]
+                []
+            ]
+        , div []
+            [ case model.mars of
                 Nothing ->
                     Html.text "No planet to render"
 
