@@ -1,8 +1,8 @@
 module Main exposing (..)
 
-import Html exposing (Html, div, p, textarea)
+import Html exposing (Html, div, p, textarea, input)
 import Html.CssHelpers exposing (withNamespace)
-import Html.Attributes exposing (id, src, rows, cols, defaultValue)
+import Html.Attributes exposing (id, src, rows, cols, defaultValue, type_)
 import Html.Events exposing (targetValue, on)
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
@@ -16,6 +16,11 @@ import Json.Decode as Json
 onKeyUp : (String -> msg) -> Attribute msg
 onKeyUp tagger =
     on "keyup" (Json.map tagger targetValue)
+
+
+onChange : (String -> msg) -> Attribute msg
+onChange tagger =
+    on "change" (Json.map tagger targetValue)
 
 
 type Command
@@ -147,22 +152,33 @@ move rover dimension =
                 updateRover rover newPosition dimension
 
 
-runCommand : Rover -> Dimension -> Command -> Rover
-runCommand rover dimension command =
+runCommand : Rover -> Dimension -> Rover
+runCommand rover dimension =
     case rover.status of
         Kabum ->
             rover
 
         Working ->
-            case command of
-                TurnRight ->
-                    { rover | direction = turnRight rover.direction }
+            case rover.commands of
+                command :: otherCommands ->
+                    case command of
+                        TurnRight ->
+                            { rover
+                                | direction = turnRight rover.direction
+                                , commands = otherCommands
+                            }
 
-                TurnLeft ->
-                    { rover | direction = turnLeft rover.direction }
+                        TurnLeft ->
+                            { rover
+                                | direction = turnLeft rover.direction
+                                , commands = otherCommands
+                            }
 
-                Move ->
-                    move rover dimension
+                        Move ->
+                            move { rover | commands = otherCommands } dimension
+
+                [] ->
+                    rover
 
 
 parseCharCommands : List Char -> List Command
@@ -475,7 +491,11 @@ main =
 
 model : Model
 model =
-    { mars = parseTextInput initialInput }
+    { mars = parseTextInput initialInput
+    , allMars = Maybe.map allSteps (parseTextInput initialInput)
+    , maxStep = Maybe.map List.length (Maybe.map allSteps (parseTextInput initialInput))
+    , step = 0
+    }
 
 
 initialInput : String
@@ -489,11 +509,16 @@ MMRMMRMRRM
 
 
 type alias Model =
-    { mars : Maybe Mars }
+    { mars : Maybe Mars
+    , allMars : Maybe (List Mars)
+    , maxStep : Maybe Int
+    , step : Int
+    }
 
 
 type Msg
     = UpdateMars String
+    | UpdateStep String
 
 
 update : Msg -> Model -> Model
@@ -501,6 +526,14 @@ update msg model =
     case msg of
         UpdateMars s ->
             { model | mars = parseTextInput s }
+
+        UpdateStep s ->
+            case String.toInt s of
+                Ok int ->
+                    { model | step = int }
+
+                _ ->
+                    model
 
 
 hasCommands : Rover -> Bool
@@ -512,12 +545,22 @@ step : Mars -> Maybe Mars
 step mars =
     if List.any hasCommands mars.rovers then
         let
-            x =
-                2
+            ( withoutCommands, withCommmands ) =
+                List.Extra.span (not << hasCommands) mars.rovers
         in
-            Nothing
+            case withCommmands of
+                targetRover :: otherRovers ->
+                    Just { mars | rovers = withCommmands ++ ((runCommand targetRover mars.dimension) :: otherRovers) }
+
+                [] ->
+                    Nothing
     else
         Nothing
+
+
+allSteps : Mars -> List Mars
+allSteps mars =
+    List.Extra.iterate step mars
 
 
 view : Model -> Html Msg
@@ -530,6 +573,25 @@ view model =
                 , cols 50
                 , onKeyUp (\string -> UpdateMars string)
                 , defaultValue initialInput
+                ]
+                []
+            ]
+        , div []
+            [ Html.span []
+                [ Html.text
+                    ("Pick a step (max: "
+                        ++ case model.maxStep of
+                            Nothing ->
+                                ""
+
+                            Just step ->
+                                toString (step - 1) ++ ")"
+                    )
+                ]
+            , input
+                [ Html.Attributes.type_ "number"
+                , onChange (\int -> UpdateStep int)
+                , defaultValue "0"
                 ]
                 []
             ]
