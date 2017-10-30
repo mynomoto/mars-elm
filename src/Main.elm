@@ -110,53 +110,50 @@ updateRover rover position dimension =
 
 move : Rover -> Dimension -> Rover
 move rover dimension =
-    case rover.direction of
-        North ->
-            let
-                position =
-                    rover.position
+    let
+        position =
+            rover.position
+    in
+        case rover.direction of
+            North ->
+                let
+                    newPosition =
+                        { position | y = position.y + 1 }
+                in
+                    updateRover rover newPosition dimension
 
-                newPosition =
-                    { position | y = rover.position.y + 1 }
-            in
-                updateRover rover newPosition dimension
+            East ->
+                let
+                    newPosition =
+                        { position | x = position.x + 1 }
+                in
+                    updateRover rover newPosition dimension
 
-        East ->
-            let
-                position =
-                    rover.position
+            South ->
+                let
+                    newPosition =
+                        { position | y = position.y - 1 }
+                in
+                    updateRover rover newPosition dimension
 
-                newPosition =
-                    { position | y = rover.position.y + 1 }
-            in
-                updateRover rover newPosition dimension
-
-        South ->
-            let
-                newPosition =
-                    { position | y = rover.position.y + 1 }
-
-                position =
-                    rover.position
-            in
-                updateRover rover newPosition dimension
-
-        West ->
-            let
-                newPosition =
-                    { position | y = rover.position.y + 1 }
-
-                position =
-                    rover.position
-            in
-                updateRover rover newPosition dimension
+            West ->
+                let
+                    newPosition =
+                        { position | x = rover.position.x - 1 }
+                in
+                    updateRover rover newPosition dimension
 
 
 runCommand : Rover -> Dimension -> Rover
 runCommand rover dimension =
     case rover.status of
         Kabum ->
-            rover
+            case rover.commands of
+                command :: otherCommands ->
+                    { rover | commands = otherCommands }
+
+                [] ->
+                    rover
 
         Working ->
             case rover.commands of
@@ -546,11 +543,11 @@ step mars =
     if List.any hasCommands mars.rovers then
         let
             ( withoutCommands, withCommmands ) =
-                List.Extra.span (not << hasCommands) mars.rovers
+                List.Extra.span (\rover -> hasCommands rover |> not) mars.rovers
         in
             case withCommmands of
                 targetRover :: otherRovers ->
-                    Just { mars | rovers = withCommmands ++ ((runCommand targetRover mars.dimension) :: otherRovers) }
+                    Just { mars | rovers = withoutCommands ++ ((runCommand targetRover mars.dimension) :: otherRovers) }
 
                 [] ->
                     Nothing
@@ -596,11 +593,15 @@ view model =
                 []
             ]
         , div []
-            [ case model.mars of
-                Nothing ->
-                    Html.text "No planet to render"
+            [ let
+                currentMars =
+                    List.Extra.getAt model.step (Maybe.withDefault [] model.allMars)
+              in
+                case currentMars of
+                    Nothing ->
+                        Html.text "No planet to render"
 
-                Just mars ->
-                    showMars mars
+                    Just mars ->
+                        showMars mars
             ]
         ]
